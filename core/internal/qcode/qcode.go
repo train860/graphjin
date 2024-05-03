@@ -51,31 +51,54 @@ const (
 	SkipTypeRemote
 )
 
+type AutoColumn struct {
+	Name    string
+	Type    string
+	Value   string
+	ValueFn func() string
+	Rule    AutoColumnRule
+	QTypes  []QType
+}
+
+// AutoColumnRule Type 枚举
+type AutoColumnRule int
+
+// ColumnUpdate=如果存在则更新，不存在则忽略
+// ColumnInsert=新增字段
+// ColumnUpsert=如果存在则更新，不存在则新增
+const (
+	ColumnUpdate AutoColumnRule = iota
+	ColumnInsert
+	ColumnUpsert
+)
+
 type ColKey struct {
 	Name string
 	Base bool
 }
 
 type QCode struct {
-	Type      QType
-	SType     QType
-	Name      string
-	ActionVar string
-	ActionVal json.RawMessage
-	Vars      []Var
-	Selects   []Select
-	Consts    []Constraint
-	Roots     []int32
-	rootsA    [5]int32
-	Mutates   []Mutate
-	MUnions   map[string][]int32
-	Schema    *sdata.DBSchema
-	Remotes   int32
-	Cache     Cache
-	Typename  bool
-	Query     []byte
-	Fragments []Fragment
-	actionArg graph.Arg
+	Type        QType
+	SType       QType
+	Name        string
+	ActionVar   string
+	ActionVal   json.RawMessage
+	Vars        []Var
+	Selects     []Select
+	Consts      []Constraint
+	Roots       []int32
+	rootsA      [5]int32
+	Mutates     []Mutate
+	MUnions     map[string][]int32
+	Schema      *sdata.DBSchema
+	Remotes     int32
+	Cache       Cache
+	Typename    bool
+	Query       []byte
+	Fragments   []Fragment
+	AutoColumns []*AutoColumn
+	AutoValues  map[string][]map[string]string
+	actionArg   graph.Arg
 }
 
 type Fragment struct {

@@ -97,8 +97,22 @@ type Config struct {
 	DisableProdSecurity bool `mapstructure:"disable_production_security" json:"disable_production_security" yaml:"disable_production_security" jsonschema:"title=Disable Production Security"`
 
 	// The filesystem to use for this instance of GraphJin
-	FS interface{} `mapstructure:"-" jsonschema:"-" json:"-"`
+	FS          interface{}   `mapstructure:"-" jsonschema:"-" json:"-"`
+	AutoColumns []*AutoColumn `json:"-"`
 }
+type AutoColumn qcode.AutoColumn
+type QType = qcode.QType
+
+const (
+	ColumnUpdate = qcode.ColumnUpdate
+	ColumnInsert = qcode.ColumnInsert
+	ColumnUpsert = qcode.ColumnUpsert
+)
+const (
+	QTInsert = qcode.QTInsert
+	QTUpdate = qcode.QTUpdate
+	QTUpsert = qcode.QTUpsert
+)
 
 // Configuration for a database table
 type Table struct {

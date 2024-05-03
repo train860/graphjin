@@ -4,6 +4,7 @@ package psql
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 
 	"github.com/dosco/graphjin/core/v3/internal/graph"
@@ -83,12 +84,36 @@ func (c *compilerContext) renderUnionStmt() {
 
 func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 	i := 0
+	colNames := make([]string, 0, len(m.Cols))
+	qtype := qcode.QTInsert
+	if m.Type == qcode.MTUpdate {
+		qtype = qcode.QTUpdate
+	}
+	if m.Type == qcode.MTUpsert {
+		qtype = qcode.QTUpsert
+	}
+	autoColumsMap := make(map[string]*qcode.AutoColumn)
+	for _, v := range c.qc.AutoColumns {
+		if !slices.Contains(v.QTypes, qtype) {
+			continue
+		}
+		if v.Value == "" && v.ValueFn == nil {
+			continue
+		}
+		if v.Type == "" {
+			v.Type = "character varying(128)"
+		}
+		autoColumsMap[v.Name] = v
+	}
+
+	autoValues := make(map[string]string)
+
 	for _, col := range m.Cols {
 		if i != 0 {
 			c.w.WriteString(`, `)
 		}
 		i++
-
+		colNames = append(colNames, col.Col.Name)
 		var vk, v string
 		isVar := false
 		isList := false
@@ -139,7 +164,17 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 			c.w.WriteString(`)`)
 
 		case col.Set:
-			c.squoted(v)
+			autoColumn := autoColumsMap[col.Col.Name]
+			if autoColumn != nil && autoColumn.Rule != qcode.ColumnInsert {
+				if autoColumn.ValueFn != nil {
+					autoColumn.Value = autoColumn.ValueFn()
+				}
+				c.squoted(autoColumn.Value)
+				autoValues[col.Col.Name] = autoColumn.Value
+
+			} else {
+				c.squoted(v)
+			}
 
 		case m.IsJSON:
 			c.colWithTable("t", col.FieldName)
@@ -158,18 +193,40 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 
 	}
 
+	for k, v := range autoColumsMap {
+		if v.Rule == qcode.ColumnInsert || (v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, k)) {
+			if i != 0 {
+				c.w.WriteString(`, `)
+			}
+			i++
+			if v.ValueFn != nil {
+				v.Value = v.ValueFn()
+			}
+			autoValues[v.Name] = v.Value
+
+			c.squoted(v.Value)
+			c.w.WriteString(` :: `)
+			c.w.WriteString(v.Type)
+
+		}
+	}
+	//add auto column value
+	if c.qc.AutoValues[m.Key] == nil {
+		c.qc.AutoValues[m.Key] = make([]map[string]string, 0)
+	}
+	c.qc.AutoValues[m.Key] = append(c.qc.AutoValues[m.Key], autoValues)
 	return i
 }
 
 func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 	i := 0
-
+	colNames := make([]string, 0, len(m.Cols))
 	for _, col := range m.Cols {
 		if i != 0 {
 			c.w.WriteString(`, `)
 		}
 		i++
-
+		colNames = append(colNames, col.Col.Name)
 		// if !values {
 		c.quoted(col.Col.Name)
 		// 	continue
@@ -210,7 +267,40 @@ func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 			c.w.WriteString(col.Col.Type)
 		}
 	*/
-
+	autoColumsMap := make(map[string]*qcode.AutoColumn)
+	qtype := qcode.QTInsert
+	if m.Type == qcode.MTUpdate {
+		qtype = qcode.QTUpdate
+	}
+	if m.Type == qcode.MTUpsert {
+		qtype = qcode.QTUpsert
+	}
+	for _, v := range c.qc.AutoColumns {
+		if !slices.Contains(v.QTypes, qtype) {
+			continue
+		}
+		if v.Value == "" && v.ValueFn == nil {
+			continue
+		}
+		autoColumsMap[v.Name] = v
+	}
+	for k, v := range autoColumsMap {
+		if v.Rule == qcode.ColumnInsert {
+			if i != 0 {
+				c.w.WriteString(`, `)
+			}
+			i++
+			c.quoted(k)
+			continue
+		}
+		if v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, k) {
+			if i != 0 {
+				c.w.WriteString(`, `)
+			}
+			i++
+			c.quoted(k)
+		}
+	}
 	return i
 }
 

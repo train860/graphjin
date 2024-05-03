@@ -248,6 +248,7 @@ type Result struct {
 	sql          string
 	role         string
 	cacheControl string
+	Qcode        *qcode.QCode
 	Vars         json.RawMessage   `json:"-"`
 	Data         json.RawMessage   `json:"data,omitempty"`
 	Hash         [sha256.Size]byte `json:"-"`
@@ -335,11 +336,11 @@ func (g *GraphJin) GraphQL(c context.Context,
 
 	// do the query
 	resp, err := gj.query(c1, r)
-	res = &resp.res
 	if err != nil {
 		return
 	}
-
+	res = &resp.res
+	res.Qcode = resp.QCode
 	// save to apq cache is apq key exists and not already in cache
 	if !inCache && rc != nil && rc.APQKey != "" {
 		gj.cache.Set((APQ_PX + rc.APQKey), r.query)
@@ -347,7 +348,7 @@ func (g *GraphJin) GraphQL(c context.Context,
 
 	// if not production then save to allow list
 	if !gj.prod && r.name != "IntrospectionQuery" {
-		if err = gj.saveToAllowList(resp.qc, resp.res.ns); err != nil {
+		if err = gj.saveToAllowList(resp.QCode, resp.res.ns); err != nil {
 			return
 		}
 	}
@@ -422,8 +423,8 @@ type graphqlReq struct {
 }
 
 type graphqlResp struct {
-	res Result
-	qc  *qcode.QCode
+	res   Result
+	QCode *qcode.QCode
 }
 
 func (gj *graphjin) newGraphqlReq(rc *ReqConfig,
@@ -494,9 +495,10 @@ func (gj *graphjin) query(c context.Context, r graphqlReq) (
 	if err != nil {
 		return
 	}
+	//生成qcode
 	err = s.compileAndExecuteWrapper(c)
 
-	resp.qc = s.qcode()
+	resp.QCode = s.qcode()
 	resp.res.sql = s.sql()
 	resp.res.cacheControl = s.cacheHeader()
 	resp.res.Vars = r.vars

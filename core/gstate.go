@@ -112,7 +112,7 @@ func (s *gstate) compileQueryForRole() (err error) {
 	} else { // compiling in dev
 		vars = s.vmap
 	}
-
+	//生成qcode
 	if st.qc, err = s.gj.qc.Compile(
 		s.r.query,
 		vars,
@@ -120,8 +120,22 @@ func (s *gstate) compileQueryForRole() (err error) {
 		s.r.ns); err != nil {
 		return
 	}
-
+	//设置是否自动添加列
+	autoColumns := make([]*qcode.AutoColumn, 0)
+	for _, v := range s.gj.conf.AutoColumns {
+		autoColumns = append(autoColumns, &qcode.AutoColumn{
+			Name:    v.Name,
+			Type:    v.Type,
+			Rule:    v.Rule,
+			QTypes:  v.QTypes,
+			Value:   v.Value,
+			ValueFn: v.ValueFn,
+		})
+	}
+	st.qc.AutoColumns = autoColumns
+	st.qc.AutoValues = make(map[string][]map[string]string)
 	var w bytes.Buffer
+	//生成sql
 	if st.md, err = s.gj.pc.Compile(&w, st.qc); err != nil {
 		return
 	}

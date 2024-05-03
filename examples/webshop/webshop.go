@@ -24,7 +24,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	// attach the graphql http handler
 	r.Handle("/graphql", gjs.GraphQL(nil))
 
