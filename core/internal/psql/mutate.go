@@ -92,6 +92,7 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 	if m.Type == qcode.MTUpsert {
 		qtype = qcode.QTUpsert
 	}
+	filteredAutoColums := make([]*qcode.AutoColumn, 0)
 	autoColumsMap := make(map[string]*qcode.AutoColumn)
 	for _, v := range c.qc.AutoColumns {
 		if !slices.Contains(v.QTypes, qtype) {
@@ -104,11 +105,16 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 			v.Type = "character varying(128)"
 		}
 		autoColumsMap[v.Name] = v
+		filteredAutoColums = append(filteredAutoColums, v)
 	}
 
 	autoValues := make(map[string]string)
 
 	for _, col := range m.Cols {
+		//不允许更新id
+		if m.Type == qcode.MTUpdate && col.Col.Name == "id" {
+			continue
+		}
 		if i != 0 {
 			c.w.WriteString(`, `)
 		}
@@ -193,8 +199,8 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 
 	}
 
-	for k, v := range autoColumsMap {
-		if v.Rule == qcode.ColumnInsert || (v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, k)) {
+	for _, v := range filteredAutoColums {
+		if v.Rule == qcode.ColumnInsert || (v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, v.Name)) {
 			if i != 0 {
 				c.w.WriteString(`, `)
 			}
@@ -222,6 +228,10 @@ func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 	i := 0
 	colNames := make([]string, 0, len(m.Cols))
 	for _, col := range m.Cols {
+		//不允许更新id
+		if m.Type == qcode.MTUpdate && col.Col.Name == "id" {
+			continue
+		}
 		if i != 0 {
 			c.w.WriteString(`, `)
 		}
@@ -267,7 +277,8 @@ func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 			c.w.WriteString(col.Col.Type)
 		}
 	*/
-	autoColumsMap := make(map[string]*qcode.AutoColumn)
+	//为了保证插入的数据是有序的，所以这里只能用list,而不能用map。避免跟column value 对应不上
+	filteredAutoColums := make([]*qcode.AutoColumn, 0)
 	qtype := qcode.QTInsert
 	if m.Type == qcode.MTUpdate {
 		qtype = qcode.QTUpdate
@@ -282,23 +293,23 @@ func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 		if v.Value == "" && v.ValueFn == nil {
 			continue
 		}
-		autoColumsMap[v.Name] = v
+		filteredAutoColums = append(filteredAutoColums, v)
 	}
-	for k, v := range autoColumsMap {
+	for _, v := range filteredAutoColums {
 		if v.Rule == qcode.ColumnInsert {
 			if i != 0 {
 				c.w.WriteString(`, `)
 			}
 			i++
-			c.quoted(k)
+			c.quoted(v.Name)
 			continue
 		}
-		if v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, k) {
+		if v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, v.Name) {
 			if i != 0 {
 				c.w.WriteString(`, `)
 			}
 			i++
-			c.quoted(k)
+			c.quoted(v.Name)
 		}
 	}
 	return i

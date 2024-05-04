@@ -1,6 +1,7 @@
 package qcode
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -9,7 +10,7 @@ import (
 	"github.com/dosco/graphjin/core/v3/internal/sdata"
 )
 
-func (co *Compiler) compileSelectArgs(sel *Select, args []graph.Arg, role string) (err error) {
+func (co *Compiler) compileSelectArgs(sel *Select, args []graph.Arg, vmap map[string]json.RawMessage, role string) (err error) {
 	for _, a := range args {
 		switch a.Name {
 		case "id":
@@ -20,7 +21,8 @@ func (co *Compiler) compileSelectArgs(sel *Select, args []graph.Arg, role string
 
 		case "where":
 			err = co.compileArgWhere(sel, a, role)
-
+			//去掉where中没有值的字段
+			sel.Where.Exp = co.clearUnusedArgs(sel.Where.Exp, vmap)
 		case "orderBy", "order_by", "order":
 			err = co.compileArgOrderBy(sel, a)
 
@@ -383,4 +385,27 @@ func (co *Compiler) compileFuncArgArgs(sel *Select, f *Field, arg graph.Arg) (er
 	}
 	f.Args = args
 	return
+}
+
+func (co *Compiler) clearUnusedArgs(e *Exp, vmap map[string]json.RawMessage) *Exp {
+	// Check if the current node's name is in the validNames map
+	if e.Right.ValType == ValVar {
+		if _, exists := vmap[e.Right.Val]; !exists {
+			return nil
+		}
+	}
+
+	// Recursively filter the children
+	var filteredChildren []*Exp
+	for _, child := range e.Children {
+		filteredChild := co.clearUnusedArgs(child, vmap)
+		if filteredChild != nil {
+			filteredChildren = append(filteredChildren, filteredChild)
+		}
+	}
+	e.Children = filteredChildren
+	if e.Right.ValType == 0 && len(e.Children) == 0 {
+		return nil
+	}
+	return e
 }

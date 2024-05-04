@@ -3,6 +3,7 @@ package graph
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -72,6 +73,7 @@ type Field struct {
 	Directives []Directive
 	Children   []int32
 	childrenA  [5]int32
+	Vars       map[string]json.RawMessage
 }
 
 type VarDef struct {

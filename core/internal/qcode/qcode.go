@@ -397,7 +397,7 @@ func (co *Compiler) Compile(
 	qc.Roots = qc.rootsA[:0]
 	qc.Type = GetQType(op.Type)
 
-	if err = co.compileQuery(qc, &op, role); err != nil {
+	if err = co.compileQuery(qc, &op, vmap, role); err != nil {
 		return
 	}
 
@@ -409,7 +409,7 @@ func (co *Compiler) Compile(
 	return
 }
 
-func (co *Compiler) compileQuery(qc *QCode, op *graph.Operation, role string) error {
+func (co *Compiler) compileQuery(qc *QCode, op *graph.Operation, vmap map[string]json.RawMessage, role string) error {
 	var id int32
 
 	if len(op.Fields) == 0 {
@@ -456,7 +456,8 @@ func (co *Compiler) compileQuery(qc *QCode, op *graph.Operation, role string) er
 		parentID := (val >> 16) & 0xFFFF
 
 		field := op.Fields[fid]
-
+		//添加vars
+		field.Vars = vmap
 		// A keyword is a cursor field at the top-level
 		// For example posts_cursor in the root
 		if field.Type == graph.FieldKeyword {
@@ -498,7 +499,7 @@ func (co *Compiler) compileQuery(qc *QCode, op *graph.Operation, role string) er
 
 		co.setLimit(tr, qc, sel)
 
-		if err := co.compileSelectArgs(sel, field.Args, role); err != nil {
+		if err := co.compileSelectArgs(sel, field.Args, field.Vars, role); err != nil {
 			return err
 		}
 

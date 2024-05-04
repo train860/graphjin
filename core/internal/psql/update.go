@@ -14,6 +14,7 @@ func (c *compilerContext) renderUpdate() {
 		case m.Type == qcode.MTUpdate:
 			i = c.renderComma(i)
 			c.renderUpdateStmt(m)
+
 		case m.Rel.Type == sdata.RelOneToOne && m.Type == qcode.MTConnect:
 			i = c.renderComma(i)
 			c.renderOneToOneConnectStmt(m)
@@ -71,6 +72,7 @@ func (c *compilerContext) renderUpdateStmt(m qcode.Mutate) {
 			c.w.WriteString(` AND `)
 			c.renderExpPath(m.Ti, m.Where.Exp, false, append(m.Path, "where"))
 		}
+
 		c.w.WriteString(`)`)
 	}
 	c.renderReturning(m)
