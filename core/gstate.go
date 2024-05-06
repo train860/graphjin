@@ -102,8 +102,17 @@ func (s *gstate) compileQueryForRole() (err error) {
 
 	var ok bool
 	if st.roc, ok = s.gj.roles[s.role]; !ok {
-		err = fmt.Errorf(`roles '%s' not defined in c.gj.config`, s.role)
-		return
+
+		if s.gj.conf.GetRole == nil {
+			err = fmt.Errorf(`roles '%s' not defined in c.gj.config`, s.role)
+			return
+		}
+		//get role from fn
+		if st.roc, err = s.gj.conf.GetRole(s.role); err != nil {
+			err = fmt.Errorf(`roles '%s' not defined in c.gj.config`, s.role)
+			return
+		}
+
 	}
 
 	var vars map[string]json.RawMessage
