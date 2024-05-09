@@ -142,7 +142,7 @@ func (s *gstate) compileQueryForRole() (err error) {
 		})
 	}
 	st.qc.AutoColumns = autoColumns
-	st.qc.AutoValues = make(map[string][]map[string]string)
+	st.qc.AutoValues = make(map[string][]map[string]string, 0)
 	var w bytes.Buffer
 	//生成sql
 	if st.md, err = s.gj.pc.Compile(&w, st.qc); err != nil {

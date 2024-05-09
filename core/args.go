@@ -32,7 +32,7 @@ func (gj *graphjin) argList(c context.Context,
 	ar = args{cindx: -1}
 	params := md.Params()
 	vl := make([]interface{}, len(params))
-	munions := st.qc.MUnions
+
 	for i, p := range params {
 		switch p.Name {
 		case "user_id", "userID", "userId":
@@ -113,10 +113,15 @@ func (gj *graphjin) argList(c context.Context,
 			}
 		}
 	}
-
 	//强制给args注入自动列
+
 	qc := st.qc
 	newValues := make([]interface{}, len(vl))
+	tables := make([]string, 0)
+
+	for _, v := range qc.Mutates {
+		tables = append(tables, v.Key)
+	}
 	if qc.SType == qcode.QTInsert || qc.SType == qcode.QTUpdate {
 		autoColumnMap := make(map[string]qcode.AutoColumn)
 		for _, v := range qc.AutoColumns {
@@ -132,7 +137,7 @@ func (gj *graphjin) argList(c context.Context,
 			if err := json.Unmarshal(v.(json.RawMessage), &newValues[i]); err != nil {
 				continue
 			}
-			addAutoColumn2Arg(newValues[i], munions, autoColumnMap)
+			addAutoColumn2Arg(qc, newValues[i], tables, autoColumnMap, tables[0])
 		}
 		ar.values = newValues
 	} else {
@@ -172,7 +177,7 @@ func parseVarVal(v json.RawMessage) interface{} {
 func argErr(p psql.Param) error {
 	return fmt.Errorf("required variable '%s' of type '%s' must be set", p.Name, p.Type)
 }
-func addAutoColumn2Arg(arg interface{}, tables map[string][]int32, autoColumnMap map[string]qcode.AutoColumn) {
+func addAutoColumn2Arg(qc *qcode.QCode, arg interface{}, tables []string, autoColumnMap map[string]qcode.AutoColumn, key string) {
 	switch arg := arg.(type) {
 
 	case map[string]interface{}:
@@ -183,22 +188,33 @@ func addAutoColumn2Arg(arg interface{}, tables map[string][]int32, autoColumnMap
 			if valueType.Kind() == reflect.Map || valueType.Kind() == reflect.Slice {
 				//k转为下划线
 				snakeKey := util.ToSnake(k)
-				if tables[snakeKey] == nil && tables[k] == nil {
+				if !slices.Contains(tables, snakeKey) {
 					continue
 				}
-				addAutoColumn2Arg(v, tables, autoColumnMap)
+
+				addAutoColumn2Arg(qc, v, tables, autoColumnMap, snakeKey)
+
 			}
 		}
+		autoValue := make(map[string]string)
 		for kk, vv := range autoColumnMap {
 			mValue := vv.Value
 			if vv.ValueFn != nil {
 				mValue = vv.ValueFn()
 			}
+			autoValue[kk] = mValue
 			arg[kk] = mValue
 		}
+		if len(autoValue) > 0 {
+			if qc.AutoValues[key] == nil {
+				qc.AutoValues[key] = make([]map[string]string, 0)
+			}
+			qc.AutoValues[key] = append(qc.AutoValues[key], autoValue)
+		}
 	case []interface{}:
+
 		for _, v := range arg {
-			addAutoColumn2Arg(v, tables, autoColumnMap)
+			addAutoColumn2Arg(qc, v, tables, autoColumnMap, key)
 		}
 	}
 }

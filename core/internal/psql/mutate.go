@@ -226,11 +226,14 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 
 		}
 	}
-	//add auto column value
-	if c.qc.AutoValues[m.Key] == nil {
-		c.qc.AutoValues[m.Key] = make([]map[string]string, 0)
+
+	if len(autoValues) > 0 {
+		// add auto column value
+		if c.qc.AutoValues[m.Key] == nil {
+			c.qc.AutoValues[m.Key] = make([]map[string]string, 0)
+		}
+		c.qc.AutoValues[m.Key] = append(c.qc.AutoValues[m.Key], autoValues)
 	}
-	c.qc.AutoValues[m.Key] = append(c.qc.AutoValues[m.Key], autoValues)
 
 	return i
 }
