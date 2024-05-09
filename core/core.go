@@ -227,6 +227,7 @@ func (gj *graphjin) initCompilers() (err error) {
 
 func (gj *graphjin) executeRoleQuery(c context.Context,
 	conn *sql.Conn,
+	st stmt,
 	vmap map[string]json.RawMessage,
 	rc *ReqConfig,
 ) (role string, err error) {
@@ -236,6 +237,7 @@ func (gj *graphjin) executeRoleQuery(c context.Context,
 	}
 
 	ar, err := gj.argList(c,
+		st,
 		gj.roleStmtMD,
 		vmap,
 		rc,

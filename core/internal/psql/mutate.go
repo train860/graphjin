@@ -4,6 +4,7 @@ package psql
 
 import (
 	"bytes"
+	"encoding/json"
 	"slices"
 	"strings"
 
@@ -138,7 +139,13 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 			if field.Type == graph.NodeVar {
 				isVar = true
 			}
-
+			if field.Type == graph.NodeObj {
+				data := getNodeValue(field, "", make(map[string]interface{}))
+				if _bytes, err := json.Marshal(data); err == nil {
+					v = string(_bytes)
+					vk = v
+				}
+			}
 			if field.Type == graph.NodeList {
 				items := make([]string, 0, len(field.Children))
 				for _, c := range field.Children {
@@ -198,11 +205,14 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 		c.w.WriteString(col.Col.Type)
 
 	}
-
 	for _, v := range filteredAutoColums {
 		if v.Rule == qcode.ColumnInsert || (v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, v.Name)) {
 			if i != 0 {
 				c.w.WriteString(`, `)
+			}
+			if m.IsJSON {
+				c.colWithTable("t", v.Name)
+				continue
 			}
 			i++
 			if v.ValueFn != nil {
@@ -221,6 +231,7 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 		c.qc.AutoValues[m.Key] = make([]map[string]string, 0)
 	}
 	c.qc.AutoValues[m.Key] = append(c.qc.AutoValues[m.Key], autoValues)
+
 	return i
 }
 
@@ -278,7 +289,6 @@ func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 		}
 	*/
 	//为了保证插入的数据是有序的，所以这里只能用list,而不能用map。避免跟column value 对应不上
-	filteredAutoColums := make([]*qcode.AutoColumn, 0)
 	qtype := qcode.QTInsert
 	if m.Type == qcode.MTUpdate {
 		qtype = qcode.QTUpdate
@@ -293,9 +303,6 @@ func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 		if v.Value == "" && v.ValueFn == nil {
 			continue
 		}
-		filteredAutoColums = append(filteredAutoColums, v)
-	}
-	for _, v := range filteredAutoColums {
 		if v.Rule == qcode.ColumnInsert {
 			if i != 0 {
 				c.w.WriteString(`, `)
@@ -312,6 +319,7 @@ func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 			c.quoted(v.Name)
 		}
 	}
+
 	return i
 }
 
@@ -644,6 +652,31 @@ func (c *compilerContext) renderMutateToRecordSet(m qcode.Mutate, n int) {
 		c.w.WriteString(col.Col.Type)
 		i++
 	}
+	qtype := qcode.QTInsert
+	if m.Type == qcode.MTUpdate {
+		qtype = qcode.QTUpdate
+	}
+	if m.Type == qcode.MTUpsert {
+		qtype = qcode.QTUpsert
+	}
+	for _, v := range c.qc.AutoColumns {
+		if !slices.Contains(v.QTypes, qtype) {
+			continue
+		}
+		if v.Value == "" && v.ValueFn == nil {
+			continue
+		}
+		if v.Type == "" {
+			v.Type = "character varying(128)"
+		}
+		if i != 0 {
+			c.w.WriteString(`, `)
+		}
+		c.quoted(v.Name)
+		c.w.WriteString(` `)
+		c.w.WriteString(v.Type)
+		i++
+	}
 	c.w.WriteString(`)`)
 }
 
@@ -672,4 +705,25 @@ func joinPath(w *bytes.Buffer, prefix string, path []string, enableCamelcase boo
 		}
 		w.WriteString(`'`)
 	}
+}
+func getNodeValue(node *graph.Node, key string, data map[string]interface{}) map[string]interface{} {
+	switch node.Type {
+	case graph.NodeObj:
+		if key != "" {
+			data[key] = make(map[string]interface{})
+		}
+		for k, v := range node.CMap {
+			getNodeValue(v, k, data)
+		}
+	case graph.NodeList:
+		if key != "" {
+			data[key] = make([]interface{}, 0)
+		}
+		for _, v := range node.Children {
+			getNodeValue(v, "", data)
+		}
+	default:
+		data[key] = node.Val
+	}
+	return data
 }

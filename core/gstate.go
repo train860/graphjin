@@ -299,19 +299,19 @@ func (s *gstate) execute(c context.Context, conn *sql.Conn) (err error) {
 }
 
 func (s *gstate) executeRoleQuery(c context.Context, conn *sql.Conn) (err error) {
-	s.role, err = s.gj.executeRoleQuery(c, conn, s.vmap, s.r.rc)
+	s.role, err = s.gj.executeRoleQuery(c, conn, s.cs.st, s.vmap, s.r.rc)
 	return
 }
 
 func (s *gstate) argList(c context.Context) (args args, err error) {
-	args, err = s.gj.argList(c, s.cs.st.md, s.vmap, s.r.rc, false)
+	args, err = s.gj.argList(c, s.cs.st, s.cs.st.md, s.vmap, s.r.rc, false)
 	return
 }
 
 func (s *gstate) argListForSub(c context.Context,
 	vmap map[string]json.RawMessage,
 ) (args args, err error) {
-	args, err = s.gj.argList(c, s.cs.st.md, vmap, s.r.rc, true)
+	args, err = s.gj.argList(c, s.cs.st, s.cs.st.md, vmap, s.r.rc, true)
 	return
 }
 

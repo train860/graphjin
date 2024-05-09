@@ -388,6 +388,9 @@ func (co *Compiler) compileFuncArgArgs(sel *Select, f *Field, arg graph.Arg) (er
 }
 
 func (co *Compiler) clearUnusedArgs(e *Exp, vmap map[string]json.RawMessage) *Exp {
+	if e == nil {
+		return nil
+	}
 	// Check if the current node's name is in the validNames map
 	if e.Right.ValType == ValVar {
 		if _, exists := vmap[e.Right.Val]; !exists {

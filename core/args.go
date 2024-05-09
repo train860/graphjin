@@ -5,8 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"slices"
 
 	"github.com/dosco/graphjin/core/v3/internal/psql"
+	"github.com/dosco/graphjin/core/v3/internal/qcode"
+	"github.com/dosco/graphjin/core/v3/internal/util"
 )
 
 // argList function is used to create a list of arguments to pass
@@ -19,6 +23,7 @@ type args struct {
 }
 
 func (gj *graphjin) argList(c context.Context,
+	st stmt,
 	md psql.Metadata,
 	fields map[string]json.RawMessage,
 	rc *ReqConfig,
@@ -27,7 +32,7 @@ func (gj *graphjin) argList(c context.Context,
 	ar = args{cindx: -1}
 	params := md.Params()
 	vl := make([]interface{}, len(params))
-
+	munions := st.qc.MUnions
 	for i, p := range params {
 		switch p.Name {
 		case "user_id", "userID", "userId":
@@ -78,7 +83,6 @@ func (gj *graphjin) argList(c context.Context,
 		default:
 			if v, ok := fields[p.Name]; ok {
 				varIsNull := bytes.Equal(v, []byte("null"))
-
 				switch {
 				case p.IsNotNull && varIsNull:
 					return ar, fmt.Errorf("variable '%s' cannot be null", p.Name)
@@ -109,7 +113,31 @@ func (gj *graphjin) argList(c context.Context,
 			}
 		}
 	}
-	ar.values = vl
+
+	//强制给args注入自动列
+	qc := st.qc
+	newValues := make([]interface{}, len(vl))
+	if qc.SType == qcode.QTInsert || qc.SType == qcode.QTUpdate {
+		autoColumnMap := make(map[string]qcode.AutoColumn)
+		for _, v := range qc.AutoColumns {
+			if !slices.Contains(v.QTypes, qc.SType) {
+				continue
+			}
+			if v.Value == "" && v.ValueFn == nil {
+				continue
+			}
+			autoColumnMap[v.Name] = *v
+		}
+		for i, v := range vl {
+			if err := json.Unmarshal(v.(json.RawMessage), &newValues[i]); err != nil {
+				continue
+			}
+			addAutoColumn2Arg(newValues[i], munions, autoColumnMap)
+		}
+		ar.values = newValues
+	} else {
+		ar.values = vl
+	}
 
 	if buildJSON && len(vl) != 0 {
 		if ar.json, err = json.Marshal(vl); err != nil {
@@ -143,4 +171,34 @@ func parseVarVal(v json.RawMessage) interface{} {
 
 func argErr(p psql.Param) error {
 	return fmt.Errorf("required variable '%s' of type '%s' must be set", p.Name, p.Type)
+}
+func addAutoColumn2Arg(arg interface{}, tables map[string][]int32, autoColumnMap map[string]qcode.AutoColumn) {
+	switch arg := arg.(type) {
+
+	case map[string]interface{}:
+
+		for k, v := range arg {
+			valueType := reflect.TypeOf(v)
+
+			if valueType.Kind() == reflect.Map || valueType.Kind() == reflect.Slice {
+				//k转为下划线
+				snakeKey := util.ToSnake(k)
+				if tables[snakeKey] == nil && tables[k] == nil {
+					continue
+				}
+				addAutoColumn2Arg(v, tables, autoColumnMap)
+			}
+		}
+		for kk, vv := range autoColumnMap {
+			mValue := vv.Value
+			if vv.ValueFn != nil {
+				mValue = vv.ValueFn()
+			}
+			arg[kk] = mValue
+		}
+	case []interface{}:
+		for _, v := range arg {
+			addAutoColumn2Arg(v, tables, autoColumnMap)
+		}
+	}
 }
