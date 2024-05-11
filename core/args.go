@@ -134,9 +134,20 @@ func (gj *graphjin) argList(c context.Context,
 			autoColumnMap[v.Name] = *v
 		}
 		for i, v := range vl {
-			if err := json.Unmarshal(v.(json.RawMessage), &newValues[i]); err != nil {
+			switch v := v.(type) {
+			case map[string]interface{}:
+				newValues[i] = v
+			case []interface{}:
+				newValues[i] = v
+			case json.RawMessage:
+				if err := json.Unmarshal(v, &newValues[i]); err != nil {
+					continue
+				}
+			default:
+				newValues[i] = v
 				continue
 			}
+
 			addAutoColumn2Arg(qc, newValues[i], tables, autoColumnMap, tables[0])
 		}
 		ar.values = newValues
