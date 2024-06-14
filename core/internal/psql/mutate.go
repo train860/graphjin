@@ -5,7 +5,6 @@ package psql
 import (
 	"bytes"
 	"encoding/json"
-	"slices"
 	"strings"
 
 	"github.com/dosco/graphjin/core/v3/internal/graph"
@@ -42,6 +41,8 @@ func (co *Compiler) compileMutation(
 		c.renderInsert()
 	case qcode.QTUpdate:
 		c.renderUpdate()
+	case qcode.QTUpdateBulk:
+		c.renderUpdateBulk()
 	case qcode.QTUpsert:
 		c.renderUpsert()
 	case qcode.QTDelete:
@@ -85,31 +86,6 @@ func (c *compilerContext) renderUnionStmt() {
 
 func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 	i := 0
-	colNames := make([]string, 0, len(m.Cols))
-	qtype := qcode.QTInsert
-	if m.Type == qcode.MTUpdate {
-		qtype = qcode.QTUpdate
-	}
-	if m.Type == qcode.MTUpsert {
-		qtype = qcode.QTUpsert
-	}
-	filteredAutoColums := make([]*qcode.AutoColumn, 0)
-	autoColumsMap := make(map[string]*qcode.AutoColumn)
-	for _, v := range c.qc.AutoColumns {
-		if !slices.Contains(v.QTypes, qtype) {
-			continue
-		}
-		if v.Value == "" && v.ValueFn == nil {
-			continue
-		}
-		if v.Type == "" {
-			v.Type = "character varying(128)"
-		}
-		autoColumsMap[v.Name] = v
-		filteredAutoColums = append(filteredAutoColums, v)
-	}
-
-	autoValues := make(map[string]string)
 
 	for _, col := range m.Cols {
 		//不允许更新id
@@ -120,7 +96,6 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 			c.w.WriteString(`, `)
 		}
 		i++
-		colNames = append(colNames, col.Col.Name)
 		var vk, v string
 		isVar := false
 		isList := false
@@ -133,6 +108,9 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 			}
 		} else {
 			field := m.Data.CMap[col.FieldName]
+			if field == nil {
+				continue
+			}
 			v = field.Val
 			vk = v
 
@@ -177,17 +155,7 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 			c.w.WriteString(`)`)
 
 		case col.Set:
-			autoColumn := autoColumsMap[col.Col.Name]
-			if autoColumn != nil && autoColumn.Rule != qcode.ColumnInsert {
-				if autoColumn.ValueFn != nil {
-					autoColumn.Value = autoColumn.ValueFn()
-				}
-				c.squoted(autoColumn.Value)
-				autoValues[col.Col.Name] = autoColumn.Value
-
-			} else {
-				c.squoted(v)
-			}
+			c.squoted(v)
 
 		case m.IsJSON:
 			c.colWithTable("t", col.FieldName)
@@ -205,36 +173,6 @@ func (c *compilerContext) renderInsertUpdateValues(m qcode.Mutate) int {
 		c.w.WriteString(col.Col.Type)
 
 	}
-	for _, v := range filteredAutoColums {
-		if v.Rule == qcode.ColumnInsert || (v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, v.Name)) {
-			if i != 0 {
-				c.w.WriteString(`, `)
-			}
-			if m.IsJSON {
-				c.colWithTable("t", v.Name)
-				continue
-			}
-			i++
-			if v.ValueFn != nil {
-				v.Value = v.ValueFn()
-			}
-			autoValues[v.Name] = v.Value
-
-			c.squoted(v.Value)
-			c.w.WriteString(` :: `)
-			c.w.WriteString(v.Type)
-
-		}
-	}
-
-	if len(autoValues) > 0 {
-		// add auto column value
-		if c.qc.AutoValues[m.Key] == nil {
-			c.qc.AutoValues[m.Key] = make([]map[string]string, 0)
-		}
-		c.qc.AutoValues[m.Key] = append(c.qc.AutoValues[m.Key], autoValues)
-	}
-
 	return i
 }
 
@@ -291,38 +229,6 @@ func (c *compilerContext) renderInsertUpdateColumns(m qcode.Mutate) int {
 			c.w.WriteString(col.Col.Type)
 		}
 	*/
-	//为了保证插入的数据是有序的，所以这里只能用list,而不能用map。避免跟column value 对应不上
-	qtype := qcode.QTInsert
-	if m.Type == qcode.MTUpdate {
-		qtype = qcode.QTUpdate
-	}
-	if m.Type == qcode.MTUpsert {
-		qtype = qcode.QTUpsert
-	}
-	for _, v := range c.qc.AutoColumns {
-		if !slices.Contains(v.QTypes, qtype) {
-			continue
-		}
-		if v.Value == "" && v.ValueFn == nil {
-			continue
-		}
-		if v.Rule == qcode.ColumnInsert {
-			if i != 0 {
-				c.w.WriteString(`, `)
-			}
-			i++
-			c.quoted(v.Name)
-			continue
-		}
-		if v.Rule == qcode.ColumnUpsert && !slices.Contains(colNames, v.Name) {
-			if i != 0 {
-				c.w.WriteString(`, `)
-			}
-			i++
-			c.quoted(v.Name)
-		}
-	}
-
 	return i
 }
 
@@ -653,31 +559,6 @@ func (c *compilerContext) renderMutateToRecordSet(m qcode.Mutate, n int) {
 		c.quoted(col.FieldName)
 		c.w.WriteString(` `)
 		c.w.WriteString(col.Col.Type)
-		i++
-	}
-	qtype := qcode.QTInsert
-	if m.Type == qcode.MTUpdate {
-		qtype = qcode.QTUpdate
-	}
-	if m.Type == qcode.MTUpsert {
-		qtype = qcode.QTUpsert
-	}
-	for _, v := range c.qc.AutoColumns {
-		if !slices.Contains(v.QTypes, qtype) {
-			continue
-		}
-		if v.Value == "" && v.ValueFn == nil {
-			continue
-		}
-		if v.Type == "" {
-			v.Type = "character varying(128)"
-		}
-		if i != 0 {
-			c.w.WriteString(`, `)
-		}
-		c.quoted(v.Name)
-		c.w.WriteString(` `)
-		c.w.WriteString(v.Type)
 		i++
 	}
 	c.w.WriteString(`)`)

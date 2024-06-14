@@ -8,8 +8,10 @@ require (
 )
 
 require (
-	github.com/dosco/graphjin/plugin/osfs/v3 v3.0.0-20230125094531-96f5ec6d2d29 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	golang.org/x/sync v0.1.0 // indirect
+	github.com/dosco/graphjin/plugin/osfs/v3 v3.0.0-20230127082222-13448e4d7160 // indirect
+	github.com/hashicorp/golang-lru v1.0.2 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
+	golang.org/x/sync v0.7.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

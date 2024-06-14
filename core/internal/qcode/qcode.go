@@ -30,6 +30,7 @@ const (
 	QTUpdate                    // Update
 	QTDelete                    // Delete
 	QTUpsert                    // Upsert
+	QTUpdateBulk                // UpdateBulk
 )
 
 type SelType int8
@@ -78,27 +79,25 @@ type ColKey struct {
 }
 
 type QCode struct {
-	Type        QType
-	SType       QType
-	Name        string
-	ActionVar   string
-	ActionVal   json.RawMessage
-	Vars        []Var
-	Selects     []Select
-	Consts      []Constraint
-	Roots       []int32
-	rootsA      [5]int32
-	Mutates     []Mutate
-	MUnions     map[string][]int32
-	Schema      *sdata.DBSchema
-	Remotes     int32
-	Cache       Cache
-	Typename    bool
-	Query       []byte
-	Fragments   []Fragment
-	AutoColumns []*AutoColumn
-	AutoValues  map[string][]map[string]string
-	actionArg   graph.Arg
+	Type      QType
+	SType     QType
+	Name      string
+	ActionVar string
+	ActionVal json.RawMessage
+	Vars      []Var
+	Selects   []Select
+	Consts    []Constraint
+	Roots     []int32
+	rootsA    [5]int32
+	Mutates   []Mutate
+	MUnions   map[string][]int32
+	Schema    *sdata.DBSchema
+	Remotes   int32
+	Cache     Cache
+	Typename  bool
+	Query     []byte
+	Fragments []Fragment
+	actionArg graph.Arg
 }
 
 type Fragment struct {
@@ -189,9 +188,10 @@ type Exp struct {
 	OrderBy bool
 
 	Left struct {
-		ID    int32
-		Table string
-		Col   sdata.DBColumn
+		ID      int32
+		Table   string
+		Col     sdata.DBColumn
+		ColName string
 	}
 	Right struct {
 		ValType  ValType
@@ -199,6 +199,7 @@ type Exp struct {
 		ID       int32
 		Table    string
 		Col      sdata.DBColumn
+		ColName  string
 		ListType ValType
 		ListVal  []string
 		Path     []string
@@ -895,11 +896,16 @@ func (co *Compiler) addSeekPredicate(sel *Select) {
 	obLen := len(sel.OrderBy)
 
 	if obLen != 0 {
+		ob := sel.OrderBy[0]
 		or = newExpOp(OpOr)
 
 		isnull := newExpOp(OpIsNull)
 		isnull.Left.Table = "__cur"
-		isnull.Left.Col = sel.OrderBy[0].Col
+		isnull.Left.Col = ob.Col
+
+		if ob.Key != "" {
+			isnull.Left.ColName = ob.Col.Name + "_" + ob.Key
+		}
 
 		or.Children = []*Exp{isnull}
 	}
@@ -918,6 +924,10 @@ func (co *Compiler) addSeekPredicate(sel *Select) {
 			f.Left.Col = ob.Col
 			f.Right.Table = "__cur"
 			f.Right.Col = ob.Col
+
+			if ob.Key != "" {
+				f.Right.ColName = ob.Col.Name + "_" + ob.Key
+			}
 
 			switch {
 			case i > 0 && n != i:
@@ -940,6 +950,10 @@ func (co *Compiler) addSeekPredicate(sel *Select) {
 
 				isnull2 := newExpOp(OpIsNull)
 				isnull2.Left.Col = ob.Col
+
+				if ob.Key != "" {
+					isnull1.Left.ColName = ob.Col.Name + "_" + ob.Key
+				}
 
 				or1 := newExpOp(OpOr)
 				or1.Children = append(or.Children, isnull1, isnull2, f)
@@ -1022,6 +1036,9 @@ func (co *Compiler) setMutationType(qc *QCode, op *graph.Operation, role string)
 			if ifNotArg(arg, graph.NodeBool) || ifNotArgVal(arg, "true") {
 				err = errors.New("value for 'delete' must be 'true'")
 			}
+		case "update_bulk", "updateBulk":
+			qc.SType = QTUpdateBulk
+			err = setActionVar(arg)
 		}
 
 		if err != nil {

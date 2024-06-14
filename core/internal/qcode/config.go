@@ -220,6 +220,9 @@ func (trv *trval) columnAllowed(qt *QCode, name string) bool {
 	case QTDelete:
 		_, ok := trv.delete.cols[name]
 		return ok || len(trv.delete.cols) == 0
+	case QTUpdateBulk:
+		_, ok := trv.update.cols[name]
+		return ok || len(trv.update.cols) == 0
 	}
 	return false
 }

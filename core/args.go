@@ -5,12 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"slices"
 
 	"github.com/dosco/graphjin/core/v3/internal/psql"
-	"github.com/dosco/graphjin/core/v3/internal/qcode"
-	"github.com/dosco/graphjin/core/v3/internal/util"
 )
 
 // argList function is used to create a list of arguments to pass
@@ -113,48 +109,7 @@ func (gj *graphjin) argList(c context.Context,
 			}
 		}
 	}
-	//强制给args注入自动列
-
-	qc := st.qc
-	newValues := make([]interface{}, len(vl))
-	tables := make([]string, 0)
-
-	for _, v := range qc.Mutates {
-		tables = append(tables, v.Key)
-	}
-	if qc.SType == qcode.QTInsert || qc.SType == qcode.QTUpdate {
-		autoColumnMap := make(map[string]qcode.AutoColumn)
-		for _, v := range qc.AutoColumns {
-			if !slices.Contains(v.QTypes, qc.SType) {
-				continue
-			}
-			if v.Value == "" && v.ValueFn == nil {
-				continue
-			}
-			autoColumnMap[v.Name] = *v
-		}
-		for i, v := range vl {
-			switch v := v.(type) {
-			case map[string]interface{}:
-				newValues[i] = v
-			case []interface{}:
-				newValues[i] = v
-			case json.RawMessage:
-				if err := json.Unmarshal(v, &newValues[i]); err != nil {
-					continue
-				}
-			default:
-				newValues[i] = v
-				continue
-			}
-
-			addAutoColumn2Arg(qc, newValues[i], tables, autoColumnMap, tables[0])
-		}
-		ar.values = newValues
-	} else {
-		ar.values = vl
-	}
-
+	ar.values = vl
 	if buildJSON && len(vl) != 0 {
 		if ar.json, err = json.Marshal(vl); err != nil {
 			return
@@ -187,45 +142,4 @@ func parseVarVal(v json.RawMessage) interface{} {
 
 func argErr(p psql.Param) error {
 	return fmt.Errorf("required variable '%s' of type '%s' must be set", p.Name, p.Type)
-}
-func addAutoColumn2Arg(qc *qcode.QCode, arg interface{}, tables []string, autoColumnMap map[string]qcode.AutoColumn, key string) {
-	switch arg := arg.(type) {
-
-	case map[string]interface{}:
-
-		for k, v := range arg {
-			valueType := reflect.TypeOf(v)
-
-			if valueType.Kind() == reflect.Map || valueType.Kind() == reflect.Slice {
-				//k转为下划线
-				snakeKey := util.ToSnake(k)
-				if !slices.Contains(tables, snakeKey) {
-					continue
-				}
-
-				addAutoColumn2Arg(qc, v, tables, autoColumnMap, snakeKey)
-
-			}
-		}
-		autoValue := make(map[string]string)
-		for kk, vv := range autoColumnMap {
-			mValue := vv.Value
-			if vv.ValueFn != nil {
-				mValue = vv.ValueFn()
-			}
-			autoValue[kk] = mValue
-			arg[kk] = mValue
-		}
-		if len(autoValue) > 0 {
-			if qc.AutoValues[key] == nil {
-				qc.AutoValues[key] = make([]map[string]string, 0)
-			}
-			qc.AutoValues[key] = append(qc.AutoValues[key], autoValue)
-		}
-	case []interface{}:
-
-		for _, v := range arg {
-			addAutoColumn2Arg(qc, v, tables, autoColumnMap, key)
-		}
-	}
 }

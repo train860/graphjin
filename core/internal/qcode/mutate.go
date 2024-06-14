@@ -23,6 +23,7 @@ const (
 	MTDisconnect
 	MTNone
 	MTKeyword
+	MTUpdateBulk
 )
 
 // const (
@@ -118,6 +119,9 @@ func (co *Compiler) compileMutation(qc *QCode,
 	case QTDelete:
 		m.Type = MTDelete
 		whereReq = true
+	case QTUpdateBulk:
+		m.Type = MTUpdateBulk
+		whereReq = false
 	default:
 		return errors.New("valid mutations: insert, update, upsert, delete'")
 	}
@@ -301,7 +305,7 @@ func (co *Compiler) newMutate(ms *mState, m Mutate, role string) error {
 			}
 		}
 
-	case MTUpdate:
+	case MTUpdate, MTUpdateBulk:
 		for _, v := range items {
 			ms.st.Push(v)
 		}
@@ -626,7 +630,7 @@ func (co *Compiler) getColumnsFromData(m *Mutate, data *graph.Node, trv trval, c
 	// but randomized maps in go make testing harder
 	// put this back in once we have integration testing
 
-	for k := range data.CMap {
+	for k, v := range data.CMap {
 		k1 := k
 		k := co.ParseName(k)
 
@@ -642,8 +646,7 @@ func (co *Compiler) getColumnsFromData(m *Mutate, data *graph.Node, trv trval, c
 		if col.Blocked {
 			return nil, fmt.Errorf("column blocked: %s", k)
 		}
-
-		cols = append(cols, MColumn{Col: col, FieldName: k1, Alias: k})
+		cols = append(cols, MColumn{Col: col, FieldName: k1, Alias: k, Value: v.Val})
 	}
 
 	return cols, nil

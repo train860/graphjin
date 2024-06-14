@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/dosco/graphjin/core/v3/internal/qcode"
 )
+
+type BeforeFunc func(client *GraphJinClient, vars map[string]json.RawMessage) (bool, error)
+type AfterFunc func(client *GraphJinClient, vars map[string]json.RawMessage) (bool, error)
 
 // Configuration for the GraphJin compiler core
 type Config struct {
@@ -69,6 +73,9 @@ type Config struct {
 	// Log warnings and other debug information
 	Debug bool `jsonschema:"title=Debug,default=false"`
 
+	// Log SQL Query variable values
+	LogVars bool `mapstructure:"log_vars" json:"log_vars" yaml:"log_vars" jsonschema:"title=Log Variables,default=false"`
+
 	// Database polling duration (in seconds) used by subscriptions to
 	// query for updates.
 	SubsPollDuration time.Duration `mapstructure:"subs_poll_duration" json:"subs_poll_duration" yaml:"subs_poll_duration" jsonschema:"title=Subscription Polling Duration,default=5s"`
@@ -97,12 +104,17 @@ type Config struct {
 	DisableProdSecurity bool `mapstructure:"disable_production_security" json:"disable_production_security" yaml:"disable_production_security" jsonschema:"title=Disable Production Security"`
 
 	// The filesystem to use for this instance of GraphJin
-	FS          interface{}                         `mapstructure:"-" jsonschema:"-" json:"-"`
-	AutoColumns []*AutoColumn                       `json:"-"`
-	GetRole     func(roleKey string) (*Role, error) `json:"-"`
+	FS           interface{}                         `mapstructure:"-" jsonschema:"-" json:"-"`
+	AutoColumns  []*AutoColumn                       `json:"-"`
+	GetRole      func(roleKey string) (*Role, error) `json:"-"`
+	BeforeExcute []BeforeFunc
+	AfterExcute  []AfterFunc
 }
 type AutoColumn qcode.AutoColumn
 type QType = qcode.QType
+type QCode = qcode.QCode
+type MColumn = qcode.MColumn
+type MType = qcode.MType
 
 const (
 	ColumnUpdate = qcode.ColumnUpdate

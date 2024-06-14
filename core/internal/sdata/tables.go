@@ -436,6 +436,15 @@ func (di *DBInfo) Hash() int {
 	return di.hash
 }
 
+func (dt *DBTable) GetTableColumn(column string) *DBColumn {
+	for _, c := range dt.Columns {
+		if c.Name == column {
+			return &c
+		}
+	}
+	return nil
+}
+
 func isInList(val string, s []string) bool {
 	for _, v := range s {
 		regex := fmt.Sprintf("^%s$", v)

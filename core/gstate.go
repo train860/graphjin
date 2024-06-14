@@ -100,19 +100,28 @@ func (s *gstate) compileQueryForRoleOnce() (err error) {
 func (s *gstate) compileQueryForRole() (err error) {
 	st := stmt{role: s.role}
 
-	var ok bool
-	if st.roc, ok = s.gj.roles[s.role]; !ok {
+	//get role from function first
+	if s.gj.conf.GetRole != nil {
 
-		if s.gj.conf.GetRole == nil {
-			err = fmt.Errorf(`roles '%s' not defined in c.gj.config`, s.role)
-			return
-		}
 		//get role from fn
 		if st.roc, err = s.gj.conf.GetRole(s.role); err != nil {
-			err = fmt.Errorf(`roles '%s' not defined in c.gj.config`, s.role)
+			err = fmt.Errorf(`get role '%s' error: %v`, s.role, err)
 			return
 		}
+		if st.roc != nil {
+			//we need add role manually, because it is not in the config
+			for _, t := range st.roc.Tables {
+				if err := addRole(s.gj.qc, *st.roc, t, s.gj.conf.DefaultBlock); err != nil {
+					return err
+				}
+			}
+		}
+	}
 
+	var ok bool
+	if st.roc, ok = s.gj.roles[s.role]; !ok {
+		err = fmt.Errorf(`roles '%s' not defined in c.gj.config`, s.role)
+		return
 	}
 
 	var vars map[string]json.RawMessage
@@ -129,22 +138,24 @@ func (s *gstate) compileQueryForRole() (err error) {
 		s.r.ns); err != nil {
 		return
 	}
-	//设置是否自动添加列
-	autoColumns := make([]*qcode.AutoColumn, 0)
-	for _, v := range s.gj.conf.AutoColumns {
-		autoColumns = append(autoColumns, &qcode.AutoColumn{
-			Name:    v.Name,
-			Type:    v.Type,
-			Rule:    v.Rule,
-			QTypes:  v.QTypes,
-			Value:   v.Value,
-			ValueFn: v.ValueFn,
-		})
+	s.compileAutoColumn(st)
+	if s.gj.conf.BeforeExcute != nil {
+		for _, fn := range s.gj.conf.BeforeExcute {
+			b, err := fn(&GraphJinClient{
+				Conf:  s.gj.conf,
+				Qcode: st.qc,
+				DB:    s.gj.db,
+			}, vars)
+			if err != nil {
+				return err
+			}
+			if !b {
+				break
+			}
+		}
 	}
-	st.qc.AutoColumns = autoColumns
-	st.qc.AutoValues = make(map[string][]map[string]string, 0)
-	var w bytes.Buffer
 	//生成sql
+	var w bytes.Buffer
 	if st.md, err = s.gj.pc.Compile(&w, st.qc); err != nil {
 		return
 	}
@@ -231,7 +242,27 @@ func (s *gstate) compileAndExecute(c context.Context) (err error) {
 	s.setDefaultVars()
 
 	// execute query
+	// 执行sql
 	err = s.execute(c, conn)
+	if err != nil {
+		return
+	}
+	//handle after execute hooks
+	if s.gj.conf.AfterExcute != nil {
+		for _, fn := range s.gj.conf.AfterExcute {
+			b, err := fn(&GraphJinClient{
+				Conf:  s.gj.conf,
+				Qcode: s.cs.st.qc,
+				DB:    s.gj.db,
+			}, s.vmap)
+			if err != nil {
+				return err
+			}
+			if !b {
+				break
+			}
+		}
+	}
 	return
 }
 

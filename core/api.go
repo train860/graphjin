@@ -83,6 +83,12 @@ type GraphJin struct {
 	done chan bool
 }
 
+type GraphJinClient struct {
+	Conf  *Config
+	DB    *sql.DB
+	Qcode *qcode.QCode
+}
+
 type Option func(*graphjin) error
 
 // NewGraphJin creates the GraphJin struct, this involves querying the database to learn its

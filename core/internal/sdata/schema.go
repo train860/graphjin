@@ -301,6 +301,14 @@ func (s *DBSchema) addVirtual(vt VirtualTable) error {
 func (s *DBSchema) GetTables() []DBTable {
 	return s.tables
 }
+func (s *DBSchema) GetTable(table string) *DBTable {
+	for _, t := range s.tables {
+		if t.Name == table {
+			return &t
+		}
+	}
+	return nil
+}
 
 type RelNode struct {
 	Name  string

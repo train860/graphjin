@@ -1,12 +1,12 @@
 go 1.21
 
 use (
-	./core
-	./conf
-	./tests
-	./serv
 	./auth
 	./cmd
-	./wasm
+	./conf
+	./core
 	./plugin/otel
+	./serv
+	./tests
+	./wasm
 )

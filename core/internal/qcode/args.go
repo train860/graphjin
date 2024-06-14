@@ -59,7 +59,7 @@ func (co *Compiler) compileSelectArgs(sel *Select, args []graph.Arg, vmap map[st
 		// case "skipIf", "skip_if":
 		// 	err = co.compileArgSkipIncludeIf(true, sel, &sel.Field, a, role)
 
-		case "insert", "update", "upsert", "delete":
+		case "insert", "update", "upsert", "delete", "update_bulk", "updateBulk":
 
 		default:
 			return unknownArg(a)
