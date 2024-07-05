@@ -256,7 +256,7 @@ func (s *gstate) compileAndExecute(c context.Context) (err error) {
 				DB:    s.gj.db,
 			}, s.vmap)
 			if err != nil {
-				return err
+				return fmt.Errorf("after execute error: %v", err)
 			}
 			if !b {
 				break
