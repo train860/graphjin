@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/dosco/graphjin/core/v3/internal/graph"
 	"github.com/dosco/graphjin/core/v3/internal/sdata"
@@ -24,7 +25,7 @@ func (co *Compiler) compileSelectArgs(sel *Select, args []graph.Arg, vmap map[st
 			//去掉where中没有值的字段
 			sel.Where.Exp = co.clearUnusedArgs(sel.Where.Exp, vmap)
 		case "orderBy", "order_by", "order":
-			err = co.compileArgOrderBy(sel, a)
+			err = co.compileArgOrderBy(sel, a, vmap)
 
 		case "distinctOn", "distinct_on", "distinct":
 			err = co.compileArgDistinctOn(sel, a)
@@ -162,7 +163,7 @@ func (co *Compiler) compileArgWhere(sel *Select, arg graph.Arg, role string) (er
 	return
 }
 
-func (co *Compiler) compileArgOrderBy(sel *Select, arg graph.Arg) (err error) {
+func (co *Compiler) compileArgOrderBy(sel *Select, arg graph.Arg, vmap map[string]json.RawMessage) (err error) {
 	if err = validateArg(arg, graph.NodeObj, graph.NodeVar); err != nil {
 		return
 	}
@@ -179,7 +180,58 @@ func (co *Compiler) compileArgOrderBy(sel *Select, arg graph.Arg) (err error) {
 		return co.compileArgOrderByObj(sel, node, cm)
 
 	case graph.NodeVar:
-		return co.compileArgOrderByVar(sel, node, cm)
+		value := vmap[node.Val]
+		_bytes, err := value.MarshalJSON()
+		if err != nil {
+			return err
+		}
+		var valueData interface{}
+		err = json.Unmarshal(_bytes, &valueData)
+		if err != nil {
+			return err
+		}
+		/***
+				为了支持以下查询：
+				 query bricks($offset: Int, $limit: Int, $orderBy: OrderByInput)  {
+					bricks(offset: $offset,limit: $limit,orderBy: $order) {
+						id
+						name
+						code
+					}
+				}
+				vars: {
+					"limit":2,
+		    		"order":["id desc","name asc"]
+			    }
+				***/
+		switch valueData := valueData.(type) {
+		case []interface{}:
+			if sel.tc.OrderBy == nil {
+				sel.tc.OrderBy = make(map[string][][2]string)
+			}
+			var arr [][2]string
+			for _, v := range valueData {
+				str := interface2Str(v)
+				list := strings.Split(str, " ")
+				params := make([]string, 0)
+				for _, v := range list {
+					if strings.TrimSpace(v) == "" {
+						continue
+					}
+					params = append(params, v)
+				}
+				if len(params) != 2 {
+					continue
+				}
+				arr = append(arr, [2]string{params[0], params[1]})
+			}
+			sel.tc.OrderBy["__auto_order_by__"] = arr
+			//移花接木，替换掉order的参数，保持跟配置文件格式一致
+			vmap[node.Val] = []byte("__auto_order_by__")
+			return co.compileArgOrderByVar(sel, node, cm)
+		default:
+			return co.compileArgOrderByVar(sel, node, cm)
+		}
 	}
 
 	return nil

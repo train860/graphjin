@@ -2,6 +2,7 @@ package qcode
 
 import (
 	"bytes"
+	"strconv"
 
 	"github.com/dosco/graphjin/core/v3/internal/graph"
 	"github.com/dosco/graphjin/core/v3/internal/util"
@@ -70,4 +71,27 @@ func graphNodeToJSON(node *graph.Node, w *bytes.Buffer) {
 		}
 		w.WriteString(`]`)
 	}
+}
+
+func interface2Str(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	switch v1 := v.(type) {
+	case string:
+		return v1
+	case []byte:
+		return string(v1)
+	case int:
+		return strconv.Itoa(v1)
+	case int64:
+		return strconv.FormatInt(v1, 10)
+	case float64:
+		return strconv.FormatFloat(v1, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(v1)
+	case float32:
+		return strconv.FormatFloat(float64(v1), 'f', -1, 32)
+	}
+	return ""
 }
