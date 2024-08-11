@@ -445,6 +445,10 @@ func (co *Compiler) clearUnusedArgs(e *Exp, vmap map[string]json.RawMessage) *Ex
 	}
 	// Check if the current node's name is in the validNames map
 	if e.Right.ValType == ValVar {
+		//需要保留特殊字段，比如userId,user_id
+		if e.Right.Val == "userId" || e.Right.Val == "user_id" {
+			return e
+		}
 		if _, exists := vmap[e.Right.Val]; !exists {
 			return nil
 		}
