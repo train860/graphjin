@@ -270,7 +270,31 @@ func parseMutationData(qc *QCode) (mData, error) {
 // the child path needs to be exluded in the json sent to insert or update
 
 func (co *Compiler) newMutate(ms *mState, m Mutate, role string) error {
-	trv := co.getRole(role, m.Ti.Schema, m.Ti.Name, m.Key)
+	actionType := ""
+	switch m.Type {
+	case MTInsert:
+		actionType = "insert"
+	case MTUpdate:
+		actionType = "update"
+	case MTUpsert:
+		actionType = "upsert"
+	case MTDelete:
+		actionType = "delete"
+	case MTConnect:
+		actionType = "connect"
+	case MTDisconnect:
+		actionType = "disconnect"
+	case MTKeyword:
+		actionType = "keyword"
+	case MTUpdateBulk:
+		actionType = "update-bulk"
+	default:
+		return fmt.Errorf("unknown mutation type: %v", m.Type)
+	}
+	trv, err := co.getRole(role, m.Ti.Schema, m.Ti.Name, m.Key, actionType)
+	if err != nil {
+		return err
+	}
 	data := m.Data
 
 	items, err := co.processNestedMutations(ms, &m, data, trv)

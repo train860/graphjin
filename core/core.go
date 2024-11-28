@@ -204,6 +204,9 @@ func (gj *graphjin) initCompilers() (err error) {
 		EnableCamelcase: gj.conf.EnableCamelcase,
 		DBSchema:        gj.schema.DBSchema(),
 		Validators:      valid.Validators,
+		GetRolePermissions: func(role, schema, table, field, op string) (qcode.TRConfig, error) {
+			return gj.getRolePermissions(role, schema, table, field, op)
+		},
 	}
 
 	gj.qc, err = qcode.NewCompiler(gj.schema, qcc)

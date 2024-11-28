@@ -364,6 +364,7 @@ func NewCompiler(s *sdata.DBSchema, c Config) (*Compiler, error) {
 	return &Compiler{c: c, s: s, tr: make(map[string]trval)}, nil
 }
 
+// Compile compiles a graphql query
 func (co *Compiler) Compile(
 	query []byte,
 	vmap map[string]json.RawMessage,
@@ -853,7 +854,10 @@ func (co *Compiler) setSingular(fieldName string, sel *Select) {
 }
 
 func (co *Compiler) setSelectorRoleConfig(role, fieldName string, qc *QCode, sel *Select) (trval, error) {
-	tr := co.getRole(role, sel.Ti.Schema, sel.Ti.Name, fieldName)
+	tr, err := co.getRole(role, sel.Ti.Schema, sel.Ti.Name, fieldName, "select")
+	if err != nil {
+		return tr, err
+	}
 
 	if tr.isBlocked(qc.SType) {
 		if qc.SType != QTQuery {

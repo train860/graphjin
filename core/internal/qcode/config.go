@@ -1,17 +1,17 @@
 package qcode
 
 type Config struct {
-	Vars            map[string]string
-	TConfig         map[string]TConfig
-	DefaultBlock    bool
-	DefaultLimit    int
-	DisableAgg      bool
-	DisableFuncs    bool
-	EnableCamelcase bool
-	DBSchema        string
-	Validators      map[string]Validator
-
-	defTrv trval
+	Vars               map[string]string
+	TConfig            map[string]TConfig
+	DefaultBlock       bool
+	DefaultLimit       int
+	DisableAgg         bool
+	DisableFuncs       bool
+	EnableCamelcase    bool
+	DBSchema           string
+	Validators         map[string]Validator
+	defTrv             trval
+	GetRolePermissions func(role, schema, table, field, actionType string) (TRConfig, error)
 }
 
 type TConfig struct {
@@ -164,25 +164,79 @@ func (co *Compiler) AddRole(role, schema, table string, trc TRConfig) error {
 	return nil
 }
 
-func (co *Compiler) getRole(role, schema, table, field string) trval {
-	var k string
+func (co *Compiler) getRole(role, schema, table, field, actionType string) (trval, error) {
+	trv := trval{role: role}
+	trc, err := co.c.GetRolePermissions(role, schema, table, field, actionType)
+	if err != nil {
+		return trv, err
+	}
+	ti, err := co.Find(schema, table)
+	if err != nil {
+		return trv, err
+	}
+	switch actionType {
+	case "select":
+		trv.query.fil, trv.query.filNU, err = compileFilter(co.s, ti, trc.Query.Filters, false)
+		if err != nil {
+			return trv, err
+		}
 
-	if co.s.IsAlias(field) {
-		k = (role + ":" + schema + ":" + field)
-	} else {
-		k = (role + ":" + schema + ":" + table)
+		if trc.Query.Limit > 0 {
+			trv.query.limit = int32(trc.Query.Limit)
+		}
+		trv.query.cols = makeSet(trc.Query.Columns)
+		trv.query.disable.funcs = trc.Query.DisableFunctions
+		trv.query.block = trc.Query.Block
+	case "insert":
+		trv.insert.cols = makeSet(trc.Insert.Columns)
+		trv.insert.presets = trc.Insert.Presets
+		trv.insert.block = trc.Insert.Block
+	case "update":
+		trv.update.fil, trv.update.filNU, err = compileFilter(co.s, ti, trc.Update.Filters, false)
+		if err != nil {
+			return trv, err
+		}
+		trv.update.cols = makeSet(trc.Update.Columns)
+		trv.update.presets = trc.Update.Presets
+		trv.update.block = trc.Update.Block
+
+	case "upsert":
+		trv.upsert.fil, trv.upsert.filNU, err = compileFilter(co.s, ti, trc.Upsert.Filters, false)
+		if err != nil {
+			return trv, err
+		}
+		trv.upsert.cols = makeSet(trc.Upsert.Columns)
+		trv.upsert.presets = trc.Upsert.Presets
+		trv.upsert.block = trc.Upsert.Block
+	case "delete":
+		trv.delete.fil, trv.delete.filNU, err = compileFilter(co.s, ti, trc.Delete.Filters, false)
+		if err != nil {
+			return trv, err
+		}
+		trv.delete.cols = makeSet(trc.Delete.Columns)
+		trv.delete.block = trc.Delete.Block
 	}
 
-	// For anon roles when a trval is not found return the default trval
-	tr, ok := co.tr[k]
-	tr.role = role
+	return trv, nil
 
-	if !ok && role == "anon" {
-		return co.c.defTrv
-	}
-	return tr
+	/*
+		var k string
+
+		if co.s.IsAlias(field) {
+			k = (role + ":" + schema + ":" + field)
+		} else {
+			k = (role + ":" + schema + ":" + table)
+		}
+
+		// For anon roles when a trval is not found return the default trval
+		tr, ok := co.tr[k]
+		tr.role = role
+
+		if !ok && role == "anon" {
+			return co.c.defTrv
+		}
+		return tr*/
 }
-
 func (co *Compiler) getTConfig(schema, name string) TConfig {
 	return co.c.TConfig[(schema + name)]
 }

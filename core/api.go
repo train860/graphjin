@@ -78,6 +78,97 @@ type graphjin struct {
 	done        chan bool
 }
 
+func (g *graphjin) getRolePermissions(role, schema, table, field, op string) (qcode.TRConfig, error) {
+	fmt.Printf("role: %s, schema: %s, table: %s, field: %s, op: %s\n", role, schema, table, field, op)
+	switch op {
+	case "select":
+		query := qcode.QueryConfig{Block: false}
+		q, err := g.conf.RolePermissions.GetTableQueryPermission(role, schema, table, field)
+		if err != nil {
+			return qcode.TRConfig{
+				Query: query,
+			}, err
+		}
+
+		if q != nil {
+			query = qcode.QueryConfig{
+				Limit:            q.Limit,
+				Filters:          q.Filters,
+				Columns:          q.Columns,
+				DisableFunctions: q.DisableFunctions,
+				Block:            q.Block,
+			}
+		}
+		return qcode.TRConfig{Query: query}, nil
+	case "insert":
+		insert := qcode.InsertConfig{Block: false}
+		result, err := g.conf.RolePermissions.GetTableInsertPermission(role, schema, table, field)
+		if err != nil {
+			return qcode.TRConfig{
+				Insert: insert,
+			}, err
+		}
+		if result != nil {
+			insert = qcode.InsertConfig{
+				Columns: result.Columns,
+				Presets: result.Presets,
+				Block:   result.Block,
+			}
+		}
+		return qcode.TRConfig{Insert: insert}, nil
+	case "update":
+		update := qcode.UpdateConfig{Block: false}
+		result, err := g.conf.RolePermissions.GetTableUpdatePermission(role, schema, table, field)
+		if err != nil {
+			return qcode.TRConfig{
+				Update: update,
+			}, err
+		}
+		if result != nil {
+			update = qcode.UpdateConfig{
+				Filters: result.Filters,
+				Columns: result.Columns,
+				Presets: result.Presets,
+				Block:   result.Block,
+			}
+		}
+		return qcode.TRConfig{Update: update}, nil
+	case "upsert":
+		upsert := qcode.UpsertConfig{Block: false}
+		result, err := g.conf.RolePermissions.GetTableUpsertPermission(role, schema, table, field)
+		if err != nil {
+			return qcode.TRConfig{
+				Upsert: upsert,
+			}, err
+		}
+		if result != nil {
+			upsert = qcode.UpsertConfig{
+				Filters: result.Filters,
+				Columns: result.Columns,
+				Presets: result.Presets,
+				Block:   result.Block,
+			}
+		}
+		return qcode.TRConfig{Upsert: upsert}, nil
+	case "delete":
+		delete := qcode.DeleteConfig{Block: false}
+		result, err := g.conf.RolePermissions.GetTableDeletePermission(role, schema, table, field)
+		if err != nil {
+			return qcode.TRConfig{
+				Delete: delete,
+			}, err
+		}
+		if result != nil {
+			delete = qcode.DeleteConfig{
+				Filters: result.Filters,
+				Block:   result.Block,
+			}
+		}
+		return qcode.TRConfig{Delete: delete}, nil
+	}
+	return qcode.TRConfig{}, nil
+}
+
 type GraphJin struct {
 	atomic.Value
 	done chan bool

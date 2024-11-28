@@ -109,6 +109,7 @@ type Config struct {
 	GetRole      func(roleKey string) (*Role, error) `json:"-"`
 	BeforeExcute []BeforeFunc
 	AfterExcute  []AfterFunc
+	RolePermissions
 }
 type AutoColumn qcode.AutoColumn
 type QType = qcode.QType
