@@ -2,9 +2,11 @@ package sdata
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"hash/fnv"
 	"regexp"
+	"sort"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -21,7 +23,7 @@ type DBInfo struct {
 	VTables   []VirtualTable `json:"-"`
 	colMap    map[string]int
 	tableMap  map[string]int
-	hash      int
+	hash      string
 }
 
 type DBTable struct {
@@ -164,15 +166,24 @@ func NewDBInfo(
 	hv := fmt.Sprintf("%s%d%s%s", dbType, dbVersion, dbSchema, dbName)
 	h.Write([]byte(hv))
 
+	// 对列进行排序以确保顺序一致
+	sort.Slice(cols, func(i, j int) bool {
+		return cols[i].String() < cols[j].String()
+	})
 	for _, c := range cols {
 		h.Write([]byte(c.String()))
 	}
 
+	// 对函数进行排序以确保顺序一致
+	sort.Slice(funcs, func(i, j int) bool {
+		return funcs[i].String() < funcs[j].String()
+	})
 	for _, fn := range funcs {
 		h.Write([]byte(fn.String()))
 	}
 
-	di.hash = h.Size()
+	// 将哈希值转换为十六进制字符串
+	di.hash = hex.EncodeToString(h.Sum(nil))
 	return di
 }
 
@@ -432,7 +443,8 @@ func (fn *DBFunction) GetInput(name string) (ret DBFuncParam, err error) {
 	return ret, fmt.Errorf("function input '%s' not found", name)
 }
 
-func (di *DBInfo) Hash() int {
+// 修改 Hash 方法以返回字符串
+func (di *DBInfo) Hash() string {
 	return di.hash
 }
 

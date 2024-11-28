@@ -137,6 +137,7 @@ func (co *Compiler) compileArgSearch(sel *Select, arg graph.Arg) (err error) {
 			return fmt.Errorf("no tsvector column defined on table '%s'", sel.Table)
 		}
 	}
+
 	if err = validateArg(arg, graph.NodeStr, graph.NodeVar); err != nil {
 		return
 	}
@@ -220,8 +221,11 @@ func (co *Compiler) compileArgOrderBy(sel *Select, arg graph.Arg, vmap map[strin
 					}
 					params = append(params, v)
 				}
-				if len(params) != 2 {
+				if len(params) == 0 {
 					continue
+				}
+				if len(params) == 1 {
+					params = append(params, "asc")
 				}
 				arr = append(arr, [2]string{params[0], params[1]})
 			}
@@ -334,7 +338,7 @@ func (co *Compiler) compileArgLimit(sel *Select, arg graph.Arg) (err error) {
 
 	case graph.NodeVar:
 		if co.s.DBType() == "mysql" {
-			return dbArgErr("limit", "number", "mysql")
+			//return dbArgErr("limit", "number", "mysql")
 		}
 		sel.Paging.LimitVar = node.Val
 	}
@@ -358,7 +362,7 @@ func (co *Compiler) compileArgOffset(sel *Select, arg graph.Arg) (err error) {
 
 	case graph.NodeVar:
 		if co.s.DBType() == "mysql" {
-			return dbArgErr("offset", "number", "mysql")
+			//return dbArgErr("offset", "number", "mysql")
 		}
 		sel.Paging.OffsetVar = node.Val
 	}

@@ -63,3 +63,29 @@ func (g *GraphJin) startDBWatcher(ps time.Duration) {
 		}
 	}
 }
+
+// 刷新数据库信息
+func (g *GraphJin) ReloadDBInfo() error {
+	gj := g.Load().(*graphjin)
+
+	latestDi, err := sdata.GetDBInfo(
+		gj.db,
+		gj.dbtype,
+		gj.conf.Blocklist)
+	if err != nil {
+		gj.log.Println(err)
+		return err
+	}
+
+	if latestDi.Hash() == gj.dbinfo.Hash() {
+		return nil
+	}
+
+	gj.log.Println("database changed. reinitializing...")
+
+	if err := g.reload(latestDi); err != nil {
+		gj.log.Println(err)
+		return err
+	}
+	return nil
+}
