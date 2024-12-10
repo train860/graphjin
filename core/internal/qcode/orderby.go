@@ -63,7 +63,7 @@ func (co *Compiler) compileArgOrderByObj(sel *Select, parent *graph.Node, cm map
 
 		case graph.NodeObj:
 			var path []sdata.TPath
-			if path, err = co.FindPath(node.Name, sel.Ti.Name, ""); err != nil {
+			if path, err = co.FindPath(node.Name, sel.Ti.Name, "", ""); err != nil {
 				continue
 			}
 			ti = path[0].LT

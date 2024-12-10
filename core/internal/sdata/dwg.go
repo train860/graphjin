@@ -228,7 +228,68 @@ type TPath struct {
 	RC  DBColumn
 }
 
-func (s *DBSchema) FindPath(from, to, through string) ([]TPath, error) {
+func (s *DBSchema) FindPath2(from, to, through, fieldName string) ([]TPath, error) {
+	fl, ok := s.ei[from]
+	if !ok {
+		return nil, ErrFromEdgeNotFound
+	}
+
+	tl, ok := s.ei[to]
+	if !ok {
+		return nil, ErrToEdgeNotFound
+	}
+	path := []TPath{}
+	// Filter edges based on field name if provided
+	for k, v := range s.ae {
+		fmt.Println(k, v.CName, v.name, v.From, v.To, v.Weight)
+	}
+	res, err := s.between(fl, tl, through)
+
+	//res, err := s.between(fl, tl, through)
+	if err != nil {
+		return nil, err
+	}
+
+	// fmt.Printf("> %s (%d) -> %s (%d)\n",
+	// 	from, res.from.nodeID,
+	// 	to, res.to.nodeID)
+
+	for _, eid := range res.edges {
+		edge := s.ae[eid]
+		path = append(path, TPath{
+			Rel: edge.Type,
+			LT:  edge.LT,
+			LC:  edge.L,
+			RT:  edge.RT,
+			RC:  edge.R,
+		})
+	}
+	if len(path) == 0 {
+		return nil, ErrPathNotFound
+	}
+	return path, nil
+}
+func (s *DBSchema) FindPath(from, to, through, fieldName string) ([]TPath, error) {
+
+	path := []TPath{}
+
+	if fieldName != "" {
+		if edgeInfos, ok := s.ei[fieldName]; ok {
+			for _, ei := range edgeInfos {
+				for _, eid := range ei.edgeIDs {
+					edge := s.ae[eid]
+					path = append(path, TPath{
+						Rel: edge.Type,
+						LT:  edge.LT,
+						LC:  edge.L,
+						RT:  edge.RT,
+						RC:  edge.R,
+					})
+				}
+			}
+		}
+		return path, nil
+	}
 	fl, ok := s.ei[from]
 	if !ok {
 		return nil, ErrFromEdgeNotFound
@@ -239,7 +300,13 @@ func (s *DBSchema) FindPath(from, to, through string) ([]TPath, error) {
 		return nil, ErrToEdgeNotFound
 	}
 
+	// Filter edges based on field name if provided
+	for k, v := range s.ae {
+		fmt.Println(k, v.CName, v.name, v.From, v.To, v.Weight)
+	}
 	res, err := s.between(fl, tl, through)
+
+	//res, err := s.between(fl, tl, through)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +315,6 @@ func (s *DBSchema) FindPath(from, to, through string) ([]TPath, error) {
 	// 	from, res.from.nodeID,
 	// 	to, res.to.nodeID)
 
-	path := []TPath{}
 	for _, eid := range res.edges {
 		edge := s.ae[eid]
 		path = append(path, TPath{

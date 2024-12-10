@@ -12,14 +12,14 @@ func TestDWG(t *testing.T) {
 		s, err := sdata.GetTestSchema()
 		assert.NoErrorFatal(t, err)
 
-		paths, err := s.FindPath("customers", "users", "")
+		paths, err := s.FindPath("customers", "users", "", "")
 		assert.NoErrorFatal(t, err)
 
 		exp := `(public.customers) public.customers.user_id [id:0, type:bigint, array:false, notNull:false, fulltext:false] -> public.users.id ==> RelOneToOne ==> (public.users) public.users.id [id:0, type:bigint, array:false, notNull:true, fulltext:false]`
 		got := paths[0].String()
 		assert.Equals(t, exp, got)
 
-		paths, err = s.FindPath("purchases", "users", "")
+		paths, err = s.FindPath("purchases", "users", "", "")
 		assert.NoErrorFatal(t, err)
 
 		exp = `(public.purchases) public.purchases.customer_id [id:0, type:bigint, array:false, notNull:false, fulltext:false] -> public.customers.id ==> RelOneToOne ==> (public.customers) public.customers.id [id:0, type:bigint, array:false, notNull:true, fulltext:false]`

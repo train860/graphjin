@@ -592,19 +592,21 @@ func (co *Compiler) addRelInfo(
 	} else if sel.ParentID != -1 {
 		parentName := co.ParseName(parentF.Name)
 		childName := co.ParseName(childF.Name)
-
-		path, err := co.FindPath(childName, parentName, sel.through)
+		//add by train
+		fieldName := childF.Alias
+		//path, err := co.FindPath(childName, parentName, sel.through)
+		path, err := co.FindPath(childName, parentName, sel.through, fieldName)
 		if err != nil {
 			return graphError(err, childName, parentName, sel.through)
 		}
 		sel.Rel = sdata.PathToRel(path[0])
 
-		// for _, p := range path {
-		// 	rel := sdata.PathToRel(p)
-		// 	fmt.Println(childF.Name, parentF.Name,
-		// 		"--->>>", rel.Left.Col.Table, rel.Left.Col.Name,
-		// 		"|", rel.Right.Col.Table, rel.Right.Col.Name)
-		// }
+		//for _, p := range path {
+		//	rel := sdata.PathToRel(p)
+		//	fmt.Println(childF.Name, parentF.Name,
+		//		"--->>>", rel.Left.Col.Table, rel.Left.Col.Name,
+		//		"|", rel.Right.Col.Table, rel.Right.Col.Name)
+		//}
 
 		rpath := path[1:]
 
@@ -789,7 +791,7 @@ func (co *Compiler) Find(schema, name string) (sdata.DBTable, error) {
 	return co.s.Find(schema, name)
 }
 
-func (co *Compiler) FindPath(from, to, through string) ([]sdata.TPath, error) {
+func (co *Compiler) FindPath(from, to, through, fieldName string) ([]sdata.TPath, error) {
 	if co.c.EnableCamelcase {
 		from = strings.TrimSuffix(from, singularSuffixSnake)
 		to = strings.TrimSuffix(to, singularSuffixSnake)
@@ -797,7 +799,7 @@ func (co *Compiler) FindPath(from, to, through string) ([]sdata.TPath, error) {
 		from = strings.TrimSuffix(from, singularSuffixCamel)
 		to = strings.TrimSuffix(to, singularSuffixCamel)
 	}
-	return co.s.FindPath(from, to, through)
+	return co.s.FindPath(from, to, through, fieldName)
 }
 
 func buildFilter(rel sdata.DBRel, pid int32) *Exp {

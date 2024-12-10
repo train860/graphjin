@@ -480,7 +480,7 @@ func (ast *aexpst) processNestedTable(av aexp, ex *Exp, node *graph.Node) (bool,
 
 		var path []sdata.TPath
 		// TODO: Make this function work with schemas
-		if path, err = ast.co.FindPath(curr, prev, ""); err != nil {
+		if path, err = ast.co.FindPath(curr, prev, "", ""); err != nil {
 			break
 		}
 
