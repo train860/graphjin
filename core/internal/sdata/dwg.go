@@ -214,7 +214,7 @@ func (s *DBSchema) Find(schema, name string) (DBTable, error) {
 
 	v, ok := s.tindex[(schema + ":" + name)]
 	if !ok {
-		return t, fmt.Errorf("table not found: %s.%s", schema, name)
+		return t, fmt.Errorf("table not found(dwg:217): %s.%s", schema, name)
 	}
 
 	return s.tables[v.nodeID], nil

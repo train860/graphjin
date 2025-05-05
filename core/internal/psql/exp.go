@@ -32,7 +32,6 @@ func (c *compilerContext) renderExpPath(ti sdata.DBTable, ex *qcode.Exp, skipNes
 func (c *expContext) render(ex *qcode.Exp) {
 	st := util.NewStackInf()
 	st.Push(ex)
-
 	for {
 		if st.Len() == 0 {
 			break

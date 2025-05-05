@@ -368,7 +368,7 @@ func (c *Config) RemoveRoleTable(role, table string) error {
 		}
 	}
 	if ti == -1 {
-		return fmt.Errorf("table not found: %s", table)
+		return fmt.Errorf("table not found(config:371): %s", table)
 	}
 
 	c.Roles[ri].Tables = append(tables[:ti], tables[ti+1:]...)

@@ -311,7 +311,7 @@ type RelNode struct {
 func (s *DBSchema) GetFirstDegree(t DBTable) (items []RelNode, err error) {
 	currNode, ok := s.tindex[(t.Schema + ":" + t.Name)]
 	if !ok {
-		return nil, fmt.Errorf("table not found: %s", t.String())
+		return nil, fmt.Errorf("table not found(schema:314): %s", t.String())
 	}
 	relatedNodes := s.rg.Connections(currNode.nodeID)
 	for _, id := range relatedNodes {
@@ -324,7 +324,7 @@ func (s *DBSchema) GetFirstDegree(t DBTable) (items []RelNode, err error) {
 func (s *DBSchema) GetSecondDegree(t DBTable) (items []RelNode, err error) {
 	currNode, ok := s.tindex[(t.Schema + ":" + t.Name)]
 	if !ok {
-		return nil, fmt.Errorf("table not found: %s", t.String())
+		return nil, fmt.Errorf("table not found(schema:327): %s", t.String())
 	}
 
 	relatedNodes1 := s.rg.Connections(currNode.nodeID)

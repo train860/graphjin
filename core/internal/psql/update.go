@@ -69,8 +69,10 @@ func (c *compilerContext) renderUpdateStmt(m qcode.Mutate) {
 		c.w.WriteString(`)`)
 
 		if m.Rel.Type == sdata.RelOneToOne {
-			c.w.WriteString(` AND `)
-			c.renderExpPath(m.Ti, m.Where.Exp, false, append(m.Path, "where"))
+			if m.Where.Exp != nil {
+				c.w.WriteString(` AND `)
+				c.renderExpPath(m.Ti, m.Where.Exp, false, append(m.Path, "where"))
+			}
 		}
 
 		c.w.WriteString(`)`)
